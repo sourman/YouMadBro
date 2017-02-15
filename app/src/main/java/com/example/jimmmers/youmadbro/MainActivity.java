@@ -1,49 +1,55 @@
 package com.example.jimmmers.youmadbro;
 
+import com.example.jimmmers.youmadbro.Jae1.src.main.java.appDev;
 import com.example.jimmmers.youmadbro.util.SystemUiHider;
+import com.ibm.watson.developer_cloud.alchemy.v1.AlchemyLanguage;
+import com.ibm.watson.developer_cloud.alchemy.v1.model.DocumentSentiment;
+import com.ibm.watson.developer_cloud.tone_analyzer.v3.ToneAnalyzer;
+import com.ibm.watson.developer_cloud.tone_analyzer.v3.model.ToneAnalysis;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.res.Resources;
+import android.graphics.drawable.Drawable;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 
-/**
- * An example full-screen activity that shows and hides the system UI (i.e.
- * status bar and navigation/system bar) with user interaction.
- *
- * @see SystemUiHider
- */
+
 public class MainActivity extends Activity {
-    /**
-     * Whether or not the system UI should be auto-hidden after
-     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-     */
+
     private static final boolean AUTO_HIDE = true;
 
-    /**
-     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
-     * user interaction before hiding the system UI.
-     */
+    String[] emotions = {"Sadness","Fear","Anger","Disgust","Joy"};
+
+    private SpeechRecognizer mSpeechRecognizer;
+    private Intent mSpeechRecognizerIntent;
+
+    private boolean mIslistening;
+
     private static final int AUTO_HIDE_DELAY_MILLIS = 1000;
 
-    /**
-     * If set, will toggle the system UI visibility upon interaction. Otherwise,
-     * will show the system UI visibility upon interaction.
-     */
+    private Intent i;
+
     private static final boolean TOGGLE_ON_CLICK = true;
 
     /**
@@ -58,20 +64,36 @@ public class MainActivity extends Activity {
     private SystemUiHider mSystemUiHider;
 
     private String resultText;
+    private boolean ready;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ready = false;
 
+        //This is some of the code for the splash screen that needs to be finished
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.splash);
+        ImageView splash = (ImageView)findViewById(R.id.splash);
+        Resources res2 = getResources();
+        Drawable mad = res2.getDrawable(R.drawable.umadbro);
+        splash.setImageDrawable(mad);
 
-        //final View controlsView = findViewById(R.id.fullscreen_content_controls);
+        setContentView(R.layout.activity_main);
         final View contentView = findViewById(R.id.fullscreen_content);
-        //resultText = (TextView)findViewById(R.id.emptyString);
-        // Set up an instance of SystemUiHider to control the system UI for
-        // this activity.
-        Log.v(TAG, "#####");
+
+
+        //This code sets up the google speech prompt
+        mSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        mSpeechRecognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        mSpeechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        mSpeechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE,
+                this.getPackageName());
+
+
+        //SpeechRecognitionListener listener = new SpeechRecognitionListener();
+        //mSpeechRecognizer.setRecognitionListener(listener);
 
         mSystemUiHider = SystemUiHider.getInstance(this, contentView, HIDER_FLAGS);
         mSystemUiHider.setup();
@@ -85,10 +107,7 @@ public class MainActivity extends Activity {
                     @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
                     public void onVisibilityChange(boolean visible) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
-                            // If the ViewPropertyAnimator API is available
-                            // (Honeycomb MR2 and later), use it to animate the
-                            // in-layout UI controls at the bottom of the
-                            // screen.
+
                             if (mControlsHeight == 0) {
                                 //mControlsHeight = controlsView.getHeight();
                             }
@@ -96,14 +115,7 @@ public class MainActivity extends Activity {
                                 mShortAnimTime = getResources().getInteger(
                                         android.R.integer.config_shortAnimTime);
                             }
-                            //controlsView.animate()
-                            //.translationY(visible ? 0 : mControlsHeight)
-                            //.setDuration(mShortAnimTime);
-                        } else {
-                            // If the ViewPropertyAnimator APIs aren't
-                            // available, simply show or hide the in-layout UI
-                            // controls.
-                            //controlsView.setVisibility(visible ? View.VISIBLE : View.GONE);
+
                         }
 
                         if (visible && AUTO_HIDE) {
@@ -118,27 +130,13 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View view) {
                 promptSpeechInput();
-                if (TOGGLE_ON_CLICK) {
-                    //mSystemUiHider.toggle();
-                } else {
-                    //mSystemUiHider.show();
-                }
             }
         });
-
-        // Upon interacting with UI controls, delay any scheduled hide()
-        // operations to prevent the jarring behavior of controls going away
-        // while interacting with the UI.
-        //findViewById(R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
     }
 
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
-
-        // Trigger the initial hide() shortly after the activity has been
-        // created, to briefly hint to the user that UI controls
-        // are available.
         delayedHide(0);
     }
 
@@ -167,10 +165,12 @@ public class MainActivity extends Activity {
     };
 
     public void promptSpeechInput(){
-        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+
+        i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-        i.putExtra(RecognizerIntent.EXTRA_PROMPT,"Say something");
+        i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something");
+
 
         try {
             startActivityForResult(i,100);
@@ -181,22 +181,88 @@ public class MainActivity extends Activity {
         }
     }
 
+
     public void onActivityResult(int request_code, int result_code, Intent i){
         super.onActivityResult(request_code,result_code,i);
         switch(request_code){
             case 100: if(result_code==RESULT_OK&&i !=null){
                 ArrayList<String> result = i.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                 //resultText.setText(result.get(0));
+
                 resultText = result.get(0);
                 TextView text = (TextView) findViewById(R.id.fullscreen_content);
                 text.setText(resultText);
 
+                MyThread thread = new MyThread(resultText);
+                thread.start();
+                try {
+                    thread.join();
+                }catch(InterruptedException j){
+                    j.printStackTrace();
+                }
+
+                String toneSen = thread.getTheTone().toString();
+                String[] split = toneSen.split("\\s");
+                float[] numberArray = new float[5];
+                String[] emotions = {"Anger","Disgust","Fear", "Joy", "Sadness"};
+                int count2=0;
+                for(int i2=0;i2<split.length;i2++){
+                    if(count2 == 5){
+                        break;
+                    }
+                    split[i2].trim();
+                    if(split[i2].length()!=0&&split[i2].charAt(0)=='0'){
+                        numberArray[count2++] =  Float.valueOf(split[i2]);
+                    }
+                }
+                float max =numberArray[0];
+                int index =0;
+                for(int i2=0;i2<numberArray.length;i2++){
+                    if(max<=numberArray[i2]){
+                        max = numberArray[i2];
+                        index =i2;
+                    }
+
+                }
+                setEmotion(emotions[index]);
             }
                 break;
         }
+    }
 
+    private void setEmotion(String emotion){
+        ImageView emoji = (ImageView)findViewById(R.id.emoji);
+        Resources res = getResources();
 
+        switch(emotion){
+            case "Joy":
+                Drawable happy = res.getDrawable(R.drawable.happy);
+                emoji.setImageDrawable(happy);
+                break;
 
+            case "Sadness":
+                Drawable sad = res.getDrawable(R.drawable.sad);
+                emoji.setImageDrawable(sad);
+                break;
+
+            case "Anger":
+                Drawable angry = res.getDrawable(R.drawable.angry);
+                emoji.setImageDrawable(angry);
+                break;
+
+            case "Fear":
+                Drawable fear = res.getDrawable(R.drawable.fear);
+                emoji.setImageDrawable(fear);
+                break;
+            case "Disgust":
+                Drawable disgusted = res.getDrawable(R.drawable.disgust);
+                emoji.setImageDrawable(disgusted);
+                break;
+            case "Neutral":
+                Drawable neutral = res.getDrawable(R.drawable.neutral);
+                emoji.setImageDrawable(neutral);
+                break;
+        }
     }
 
 
@@ -208,4 +274,31 @@ public class MainActivity extends Activity {
         mHideHandler.removeCallbacks(mHideRunnable);
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
     }
+
+    
+    //The network operation must be rum on a seperate thread
+    public static class MyThread extends Thread {
+        String text;
+        ToneAnalysis tone;
+        public MyThread(String text){
+            this.text = text;
+
+        }
+
+        public void run(){
+            ToneAnalyzer service = new ToneAnalyzer(ToneAnalyzer.VERSION_DATE_2016_05_19);
+            service.setUsernameAndPassword("1079029d-f17e-4bd0-800d-a7340ead306b", "wrM841ZlRaHA");
+
+            try {
+                tone = service.getTone(text, null).execute();
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        public ToneAnalysis getTheTone(){
+            return tone;
+        }
+    }
+
 }
